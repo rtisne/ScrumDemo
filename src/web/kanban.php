@@ -3,7 +3,6 @@ include_once('config.php');
 include_once('projectInfos.php');
 include_once('sprintInfos.php');
 
-
 if($_SERVER['REQUEST_METHOD'] === "POST" && isset($_POST['submit']) && ($_POST["submit"] == "create") && $isMember){
     createTask();
 
@@ -15,6 +14,21 @@ if($_SERVER['REQUEST_METHOD'] === "POST" && isset($_POST['submit']) && ($_POST["
 if($_SERVER['REQUEST_METHOD'] === "POST" && isset($_POST['submit']) && ($_POST["submit"] == "update") && $isMember){
     updateTask();
 }
+
+
+if($_SERVER['REQUEST_METHOD'] === "POST" && isset($_POST['submit']) && ($_POST["submit"] == "stories_states") && $isMember){
+    get_stories_state();
+}
+
+if($_SERVER['REQUEST_METHOD'] === "POST" && isset($_POST['submit']) && ($_POST["submit"] == "stories_change_states") && $isMember){
+    update_task_state();
+}
+
+
+if($_SERVER['REQUEST_METHOD'] === "POST" && isset($_POST['submit']) && ($_POST["submit"] == "updateUSState") && $isMember){
+    update_us_state();
+}
+
 
 function createTask() {
     extract($_POST);
@@ -43,7 +57,7 @@ function updateTask(){
     extract($_POST);
     if (!empty($title) &&
         !empty($detail)) {
-        $safe_values = array("title" => $title , "description"=>$detail, "state"=>0, "id_us"=>intval(getAllID(intval($_GET['id_sprint']))['id']));
+        $safe_values = array("title" => $title , "description"=>$detail);
         if(!empty($develop)){
             $safe_values["implementer"] = $develop;
         }
@@ -66,8 +80,7 @@ function updateTask(){
 function update_task_in_db($values){
     $task_columns =  array_keys($values);
     $task_values = array_values($values);
-    $task_values["id"] = $_POST["task_id"];
-
+    $task_values["id"] = isset($_POST["task_id"])?$_POST["task_id"]:$_POST["id"];
     execute_query(create_update_sql("task",$task_columns),$task_values);
 
 }
@@ -135,6 +148,83 @@ function add_task_dependency($values) {
     $task_dependency_values = array_values($values);
     return execute_query(create_insert_sql("task_dependency",$task_dependency_columns),$task_dependency_values);
 }
+
+
+
+function update_task_state(){
+    $task_id = $_POST["id"];
+
+    $state = $_POST["state"];
+    $user_story = $_POST["user_story_id"];
+    $valid_state = ["TODO","DOING","TESTING","DONE"];
+
+    if(!can_move($task_id) && array_search($state,$valid_state)!=0){
+        perform_query("UPDATE task SET state=0, commit=null WHERE id=$task_id");
+        echo json_encode(array('error' => 'dependance'));
+        exit(1);
+    }
+
+    if(!empty($state)  && in_array($state,$valid_state)){
+        $safe_values = ["state" => array_search($state,$valid_state) , "id_us" => $user_story]; // assume that $valid_state does not contains duplicate items
+        update_task_in_db($safe_values);
+    }
+
+
+    if(user_story_has_done($user_story)){
+       // perform_query("UPDATE user_story SET state=1 WHERE id=$user_story");
+        echo json_encode(array('idUS' => $user_story));
+        exit(1);
+    }else{
+        perform_query("UPDATE user_story SET state=0, commit=null WHERE id=$user_story");
+    }
+}
+
+function update_us_state(){
+    extract($_POST);
+    $newCommit = null;
+    if(!empty($commit)){
+        $newCommit = $commit;
+    }
+    $newState = 1;
+    if(empty($state)) {
+        $newState = 0;
+        $newCommit = null;
+    }
+    if($newState == 1)
+        return perform_query("UPDATE user_story SET state=1, commit='".$newCommit."'  WHERE id=$user_story");
+
+}
+
+function user_story_has_done($user_story_id){
+
+    $sql_query = "SELECT state from task WHERE id_us = $user_story_id";
+    $all_state = fetch_all($sql_query);
+
+    foreach($all_state as $state){
+        if($state["state"] != 3){
+            return false;
+        }
+    }
+    return true;
+}
+
+function can_move($task_id){
+    $sql_query = "SELECT depend_to FROM task_dependency WHERE task=$task_id ";
+    $dependencies = fetch_all($sql_query);
+    if(empty($dependencies))
+        return true;
+
+    foreach ($dependencies as $dependency) {
+        $dependency_id = $dependency["depend_to"];
+        $sql_query = "SELECT state FROM task WHERE id=$dependency_id";
+        $result = fetch_first($sql_query);
+        if ($result["state"] == 3) {
+            return true;
+        }
+    }
+    return false;
+}
+
 
 $tab="sprints";
 

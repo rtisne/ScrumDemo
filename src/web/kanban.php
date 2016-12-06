@@ -169,14 +169,17 @@ function update_task_state(){
         update_task_in_db($safe_values);
     }
 
-
-    if(user_story_has_done($user_story)){
-       // perform_query("UPDATE user_story SET state=1 WHERE id=$user_story");
-        echo json_encode(array('idUS' => $user_story));
-        exit(1);
-    }else{
-        perform_query("UPDATE user_story SET state=0, commit=null WHERE id=$user_story");
+    if(!isAll($user_story))
+    {
+        if(user_story_has_done($user_story)){
+           // perform_query("UPDATE user_story SET state=1 WHERE id=$user_story");
+            echo json_encode(array('idUS' => $user_story));
+            exit(1);
+        }else{
+            perform_query("UPDATE user_story SET state=0, commit=null WHERE id=$user_story");
+        }
     }
+
 }
 
 function update_us_state(){
@@ -206,6 +209,12 @@ function user_story_has_done($user_story_id){
         }
     }
     return true;
+}
+
+function isAll($id_us){
+    $sql_query = "SELECT is_all FROM user_story WHERE id = ". $id_us."";
+    $result = fetch_first($sql_query);
+    return intval($result['is_all']);
 }
 
 function can_move($task_id){

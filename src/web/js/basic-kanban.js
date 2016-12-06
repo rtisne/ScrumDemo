@@ -9,10 +9,7 @@ $( function() {
             var $task_data = $(ui.item).find("*[data-id]").data("id");
             var $story_id = $($curr_td).closest("tr").data("id").id;
             $.extend($task_data, {submit: 'stories_change_states', state: $us_state, user_story_id: $story_id});
-
             send_state_change_request($task_data);
-
-            $(this).sortable('cancel');
         }
     }).disableSelection();
 
@@ -23,13 +20,13 @@ $( function() {
             data: $task_data,
             dataType: "json",
             success: function(data){
-
                 if(typeof data.idUS !== 'undefined'){
                     $("#update_form_user_story_state").prop('checked', false);
                     $("#update_form_user_story_commit").attr( "disabled", true );
                     $("#update_form_user_story_commit").val('');
                     $(".user_story_selected").val(data.idUS);
                     $('#commit_popup').modal();
+                    return;
                 }
                 if(typeof  data.error !== 'undefined'){
                     location.reload();
@@ -39,4 +36,3 @@ $( function() {
     }
 
 });
-
